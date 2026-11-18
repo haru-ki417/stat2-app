@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  data:
+    name: 問題データと計算ドリルのテスト
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: 知識問題の形・計算の部品・全パターンを 5000 回ずつ生成
+        run: node tests/check.mjs 5000
+
+  browser:
+    name: スマホ幅のブラウザーで動かす
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Playwright を入れる
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: 解答・分野別・公式・オフライン起動まで通す
+        run: python tests/smoke.py
