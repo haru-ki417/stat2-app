@@ -1,9 +1,9 @@
 // オフラインで使うためのサービスワーカー
 // まず保存してある版を表示し、つながっていれば裏で最新版を取りに行く（次に開いたときに新しい版になる）
-const CACHE = "stat2-v2";
+const CACHE = "stat2-v3";
 const FILES = [
   "./", "./index.html", "./manifest.webmanifest",
-  "./css/style.css", "./js/questions.js", "./js/drills.js", "./js/app.js",
+  "./css/style.css", "./js/tables.js", "./js/topics.js", "./js/questions.js", "./js/drills.js", "./js/app.js",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png"
 ];
 

@@ -17,16 +17,32 @@
 <body>
 <div class="wrap">
   <h1>統計検定2級 スマホ演習</h1>
-  <p class="lead">知識問題と、数値が毎回変わる計算ドリル。分野別にも解けます。成績はこのスマホの中だけに保存され、オフラインでも使えます。</p>
   <div class="tabs">
-    <button class="tab on" data-v="home">問題</button>
+    <button class="tab on" data-v="home">学習</button>
+    <button class="tab" data-v="topics">範囲</button>
+    <button class="tab" data-v="mockhome">模試</button>
     <button class="tab" data-v="formula">公式・数表</button>
   </div>
   <div id="home"></div>
-  <div id="quiz" class="hide"></div>
+  <div id="topics" class="hide"></div>
+  <div id="topic" class="hide"></div>
+  <div id="mockhome" class="hide"></div>
+  <div id="mock" class="hide"></div>
   <div id="formula" class="hide"></div>
+  <div id="quiz" class="hide"></div>
 </div>
 
+<button class="fab" onclick="calcOpen()" aria-label="電卓">電卓</button>
+<div id="calc" class="sheet hide">
+  <div class="sheet-in">
+    <div class="calc-top"><span class="small">電卓</span><button class="link" onclick="calcClose()">閉じる</button></div>
+    <div class="cdisp"><div id="cexp">0</div><div id="cres"></div></div>
+    <div class="keys"><button data-k="C">C</button><button data-k="(">(</button><button data-k=")">)</button><button data-k="÷">÷</button><button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button><button data-k="×">×</button><button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button><button data-k="−">−</button><button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button><button data-k="+">+</button><button data-k="0">0</button><button data-k=".">.</button><button data-k="√">√</button><button data-k="=" class=eq>=</button><button data-k="x²">x²</button><button data-k="^">^</button><button data-k="Ans">Ans</button><button data-k="←">←</button></div>
+  </div>
+</div>
+
+<script src="js/tables.js"></script>
+<script src="js/topics.js"></script>
 <script src="js/questions.js"></script>
 <script src="js/drills.js"></script>
 <script src="js/app.js"></script>
