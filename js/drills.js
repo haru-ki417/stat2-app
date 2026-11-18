@@ -14,7 +14,7 @@ const T025={4:2.776,5:2.571,6:2.447,7:2.365,8:2.306,9:2.262,10:2.228,11:2.201,12
 function mk(f,q,ans,wr,e,d,u){
   u=u||"";const F=v=>fmt(v,d)+u;const c=[F(ans)];
   for(const w of wr){if(!isFinite(w))continue;const s=F(w);if(!c.includes(s))c.push(s);if(c.length===4)break;}
-  let t=0;while(c.length<4&&t<200){t++;const k=(Math.random()<.5?-1:1)*(0.1+Math.random()*0.5);const v=ans===0?k:ans*(1+k);const s=F(v);if(!c.includes(s))c.push(s);}
+  let t=0;while(c.length<4&&t<200){t++;const k=(Math.random()<.5?-1:1)*(0.1+Math.random()*0.5);const v=Math.abs(ans)<1e-9?k:ans*(1+k);const s=F(v);if(!c.includes(s))c.push(s);}
   return {f,q,c,a:0,e,gen:true};
 }
 // 文字列の選択肢を作る
@@ -204,4 +204,163 @@ anova:[
  `基準時の数量で重み付け：Σp₁q₀/Σp₀q₀×100 = ${p1[0]*q0[0]+p1[1]*q0[1]}/${p0[0]*q0[0]+p0[1]*q0[1]}×100 ≈ ${fmt(L,1)}。比較時の数量を使うとパーシェ指数（${fmt(Pa,1)}）。`,1);}
 ]
 };
-function genOne(fid){const fs=fid?[fid]:FIELDS.map(f=>f.id).filter(id=>GEN[id]);const f=pick(fs);const q=pick(GEN[f])();q.id="g";return q;}
+
+// ---------- 上の問題に出題範囲の項目を付ける（並びは GEN と同じ） ----------
+const GTAG={
+ desc:["d_spread","d_center","d_corr","m_r1","d_use","d_spread","a_ts","d_center"],
+ coll:["c_samp","c_samp"],
+ prob:["p_rule","p_rule","p_rule","p_bayes","p_rule","p_rule"],
+ dist:["r_disc","r_disc","r_disc","r_var","r_var","r_cont","r_cont","r_cont","r_cont","r_disc"],
+ samp:["s_samp","s_samp","s_samp","s_tcf"],
+ est:["e_mean","e_mean","e_prop","e_size","e_size","e_size"],
+ test:["h_one","h_basic","h_one","h_two","h_chi","h_chi","h_chi","h_two"],
+ reg:["m_out","m_r1","m_r1","m_reg","m_reg","m_r1"],
+ anova:["a_anova","a_anova","a_anova","a_ts","a_ts"]
+};
+// GENS：計算ドリルの全パターン。k は成績を記録するための名前
+const GENS=[];
+for(const f in GEN)GEN[f].forEach((fn,i)=>GENS.push({k:f+i,t:GTAG[f][i],fn}));
+
+// ---------- 追加の計算の部品 ----------
+function randn(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+function lgamma(z){const c=[0.99999999999980993,676.5203681218851,-1259.1392167224028,771.32342877765313,-176.61502916214059,12.507343278686905,-0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];
+ if(z<0.5)return Math.log(Math.PI/Math.sin(Math.PI*z))-lgamma(1-z);z-=1;let x=c[0];for(let i=1;i<9;i++)x+=c[i]/(z+i);const t=z+7.5;return 0.5*Math.log(2*Math.PI)+(z+0.5)*Math.log(t)-t+Math.log(x);}
+// t 分布の両側 p 値（密度をシンプソン法で積分）
+function tP(t,v){const a=Math.abs(t),N=800,h=a/N,k=Math.exp(lgamma((v+1)/2)-lgamma(v/2))/Math.sqrt(v*Math.PI),f=x=>k*Math.pow(1+x*x/v,-(v+1)/2);
+ let s=f(0)+f(a);for(let i=1;i<N;i++)s+=f(i*h)*(i%2?4:2);return Math.max(0,1-2*s*h/3);}
+const pTxt=p=>p<0.001?"&lt; 0.001":fmt(p,3);
+const C=comb;
+// 表（HTML）
+function tbl(head,rows){return `<table class="qt"><tr>${head.map(h=>`<th>${h}</th>`).join("")}</tr>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join("")}</tr>`).join("")}</table>`;}
+// 図（SVG）。色はページの CSS 変数を使うのでダークモードでも見える
+const svg=(w,h,body)=>`<svg class="fig" viewBox="0 0 ${w} ${h}" role="img">${body}</svg>`;
+const AX='stroke="var(--sub)" stroke-width="1"',GR='stroke="var(--line)" stroke-width="1"',TX='fill="var(--sub)" font-size="11"';
+function pickOthers(all,ans,n){return shuffle(all.filter(x=>x!==ans)).slice(0,n);}
+function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+const add=(t,k,fn)=>GENS.push({t,k,fn});
+
+// ---------- 追加の計算ドリル（範囲の抜けを埋める） ----------
+add("d_center","d_freqmean",()=>{const v=[1,2,3,4,5].map(x=>x*pick([1,2,10])),n=v.map(()=>ri(1,12)),N=sum(n),m=sum(v.map((x,i)=>x*n[i]))/N;
+ return mk("desc",`度数分布表から平均を求めよ。${tbl(["値",...v],[["度数",...n]])}`,m,[sum(v)/v.length,sum(v.map((x,i)=>x*n[i]))/v.length,v[n.indexOf(Math.max(...n))]],
+ `Σ(値×度数)/総度数 = ${sum(v.map((x,i)=>x*n[i]))}/${N} ≈ ${fmt(m)}。値だけの平均や最頻値と混同しない。`,2);});
+add("d_corr","d_partial",()=>{let rxy,rxz,ryz;do{rxy=pick([0.4,0.5,0.6,0.7,0.8]);rxz=pick([0.5,0.6,0.7,0.8]);ryz=pick([0.4,0.5,0.6,0.7,0.8]);}while(1-rxy*rxy-rxz*rxz-ryz*ryz+2*rxy*rxz*ryz<=0.05);
+ const a=(rxy-rxz*ryz)/Math.sqrt((1-rxz*rxz)*(1-ryz*ryz));
+ return mk("desc",`r<sub>xy</sub>=${rxy}、r<sub>xz</sub>=${rxz}、r<sub>yz</sub>=${ryz} のとき、z の影響を除いた x と y の偏相関係数 r<sub>xy·z</sub> は？`,a,[rxy-rxz*ryz,(rxy-rxz*ryz)/((1-rxz*rxz)*(1-ryz*ryz)),rxy*rxz*ryz],
+ `(r<sub>xy</sub> − r<sub>xz</sub>r<sub>yz</sub>)/√((1−r<sub>xz</sub>²)(1−r<sub>yz</sub>²)) = (${rxy} − ${fmt(rxz*ryz,2)})/√(${fmt(1-rxz*rxz,2)}×${fmt(1-ryz*ryz,2)}) ≈ ${fmt(a,3)}。`,3);});
+add("d_corr","d_scatter",()=>{const T=[-0.9,-0.5,0,0.5,0.9],tg=pick(T);let x,y,r;
+ do{x=Array.from({length:40},randn);y=x.map(v=>tg*v+Math.sqrt(1-tg*tg)*randn());const mx=sum(x)/40,my=sum(y)/40;r=sum(x.map((v,i)=>(v-mx)*(y[i]-my)))/Math.sqrt(sum(x.map(v=>(v-mx)**2))*sum(y.map(v=>(v-my)**2)));}while(Math.abs(r-tg)>0.06);
+ const sx=v=>30+(v+3)/6*220,sy=v=>190-(v+3)/6*170;
+ const pts=x.map((v,i)=>`<circle cx="${fmt(sx(Math.max(-3,Math.min(3,v))),1)}" cy="${fmt(sy(Math.max(-3,Math.min(3,y[i]))),1)}" r="3.2" fill="var(--accent)" opacity=".75"/>`).join("");
+ const g=svg(270,205,`<line x1="30" y1="190" x2="255" y2="190" ${AX}/><line x1="30" y1="15" x2="30" y2="190" ${AX}/><text x="245" y="203" ${TX}>x</text><text x="15" y="22" ${TX}>y</text>${pts}`);
+ const L=v=>fmt(v,1);
+ return mkS("desc",`次の散布図の相関係数に最も近いのは？${g}`,L(tg),pickOthers(T.map(L),L(tg),3),`点の並びから読む。この図の相関係数は約 ${fmt(r,2)}。右上がりなら正、右下がりなら負で、直線に近いほど |r| は1に近い。`);});
+add("d_cat","d_cross",()=>{const a=ri(10,60),b=ri(10,60),c=ri(10,60),d=ri(10,60),row=Math.random()<.5;
+ const T=tbl(["","購入あり","購入なし","計"],[["男性",a,b,a+b],["女性",c,d,c+d],["計",a+c,b+d,a+b+c+d]]);
+ return row?mk("desc",`クロス表で、女性の購入率は？${T}`,c/(c+d)*100,[c/(a+c)*100,c/(a+b+c+d)*100,(a+c)/(a+b+c+d)*100],`女性の行の合計で割る（行パーセント）：${c}/${c+d} ≈ ${fmt(c/(c+d)*100,1)}%。`,1,"%")
+ :mk("desc",`クロス表で、購入した人のうち女性の割合は？${T}`,c/(a+c)*100,[c/(c+d)*100,c/(a+b+c+d)*100,(c+d)/(a+b+c+d)*100],`購入ありの列の合計で割る（列パーセント）：${c}/${a+c} ≈ ${fmt(c/(a+c)*100,1)}%。`,1,"%");});
+add("d_spread","d_boxplot",()=>{let v;do{v=[ri(0,4),0,0,0,ri(14,20)].map(x=>x*5);v[1]=v[0]+5*ri(1,4);v[3]=v[4]-5*ri(1,4);v[2]=5*ri(v[1]/5+1,v[3]/5-1);}while(!(v[1]<v[2]&&v[2]<v[3]));
+ const X=x=>20+x*2.4;let ax="";for(let t=0;t<=100;t+=10)ax+=`<line x1="${X(t)}" y1="20" x2="${X(t)}" y2="88" ${GR}/><text x="${X(t)}" y="102" ${TX} text-anchor="middle">${t}</text>`;
+ for(let t=5;t<100;t+=10)ax+=`<line x1="${X(t)}" y1="20" x2="${X(t)}" y2="88" ${GR} stroke-dasharray="2 3"/>`;
+ const g=svg(270,108,ax+`<line x1="${X(v[0])}" y1="54" x2="${X(v[1])}" y2="54" stroke="var(--ink)" stroke-width="1.6"/><line x1="${X(v[3])}" y1="54" x2="${X(v[4])}" y2="54" stroke="var(--ink)" stroke-width="1.6"/>
+ <line x1="${X(v[0])}" y1="44" x2="${X(v[0])}" y2="64" stroke="var(--ink)" stroke-width="1.6"/><line x1="${X(v[4])}" y1="44" x2="${X(v[4])}" y2="64" stroke="var(--ink)" stroke-width="1.6"/>
+ <rect x="${X(v[1])}" y="34" width="${X(v[3])-X(v[1])}" height="40" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.6"/><line x1="${X(v[2])}" y1="34" x2="${X(v[2])}" y2="74" stroke="var(--accent)" stroke-width="2.4"/>`);
+ const k=pick(["iqr","med","range"]),A={iqr:v[3]-v[1],med:v[2],range:v[4]-v[0]},N={iqr:"四分位範囲",med:"中央値",range:"範囲（最大−最小）"};
+ return mk("desc",`箱ひげ図から読み取れる${N[k]}は？（目盛りは5ごと）${g}`,A[k],Object.keys(A).filter(x=>x!==k).map(x=>A[x]).concat([v[3]-v[2],v[2]-v[1]]),
+ `最小 ${v[0]}、Q₁ ${v[1]}、中央値 ${v[2]}、Q₃ ${v[3]}、最大 ${v[4]}。四分位範囲は Q₃−Q₁ = ${v[3]-v[1]}、範囲は ${v[4]-v[0]}。`,0);});
+add("d_dist","d_hist",()=>{const kind=pick(["right","left","sym"]);const base={right:[3,9,14,12,9,6,4,3,2,1],left:[1,2,3,4,6,9,12,14,9,3],sym:[1,3,6,10,14,14,10,6,3,1]}[kind].map(v=>Math.max(1,v+ri(-1,1)));
+ const mx=Math.max(...base),bars=base.map((v,i)=>`<rect x="${25+i*23}" y="${170-v/mx*140}" width="22" height="${v/mx*140}" fill="var(--accent)" opacity=".8"/>`).join("");
+ const g=svg(270,185,`<line x1="22" y1="170" x2="258" y2="170" ${AX}/>${bars}`);
+ const O=["平均 > 中央値","平均 < 中央値","平均 ≈ 中央値","この図からは判断できない"],a={right:0,left:1,sym:2}[kind];
+ return mkS("desc",`次のヒストグラムの分布について、平均と中央値の関係として最も適切なのは？${g}`,O[a],O.filter((_,i)=>i!==a),
+ {right:"右に裾が長い（歪度が正）。大きい値に平均が引っ張られるので 平均 > 中央値。",left:"左に裾が長い（歪度が負）。小さい値に引っ張られて 平均 < 中央値。",sym:"左右ほぼ対称なので平均と中央値はほぼ等しい。"}[kind]);});
+add("d_use","d_zcompare",()=>{let ma,sa,xa,mb,sb,xb,za,zb;do{ma=ri(50,70);sa=pick([5,8,10,12,15]);xa=ma+ri(-5,20);mb=ri(40,80);sb=pick([4,6,10,16,20]);xb=mb+ri(-5,25);za=(xa-ma)/sa;zb=(xb-mb)/sb;}while(Math.abs(za-zb)<0.25);
+ const O=["国語の方が相対的に良い","数学の方が相対的に良い","同じくらい","平均が違うので比べられない"],k=za>zb?0:1;
+ return mkS("desc",`国語：平均${ma}・標準偏差${sa}で${xa}点。数学：平均${mb}・標準偏差${sb}で${xb}点。集団の中での位置が良いのは？`,O[k],O.filter((_,i)=>i!==k),
+ `z で比べる。国語 (${xa}−${ma})/${sa} ≈ ${fmt(za)}、数学 (${xb}−${mb})/${sb} ≈ ${fmt(zb)}。点数そのものでは比べられない。`);});
+add("p_bayes","p_bayes3",()=>{const s=pick([[50,30,20],[40,35,25],[60,30,10],[45,35,20]]),d=[ri(1,5),ri(1,5),ri(1,5)],k=ri(0,2),tot=sum(s.map((v,i)=>v*d[i])),ans=s[k]*d[k]/tot;
+ return mk("prob",`機械A・B・Cが製品の${s.join("%・")}%を作り、不良率はそれぞれ${d.join("%・")}%。不良品を1つ選んだとき、それが機械${"ABC"[k]}製である確率は？`,ans,[d[k]/sum(d),s[k]/100,s[k]*d[k]/10000],
+ `全体の不良率 = ${s.map((v,i)=>`${v/100}×${d[i]/100}`).join(" + ")} = ${fmt(tot/10000,4)}。${"ABC"[k]} の分 ${fmt(s[k]*d[k]/10000,4)} を割って ${fmt(ans,3)}。`,3);});
+add("r_var","r_cheb",()=>{const m=ri(40,70),s=pick([4,5,8,10]),k=pick([1.5,2,2.5,3,4]),d=k*s;
+ return mk("dist",`ある分布の平均が ${m}、標準偏差が ${s}（分布の形は不明）。値が ${fmt(m-d,1).replace(/\.0$/,"")} 以下または ${fmt(m+d,1).replace(/\.0$/,"")} 以上になる割合の上限は（チェビシェフの不等式）？`,100/(k*k),[100/k,100-100/(k*k),2*(1-phi(k))*100],
+ `平均から ${fmt(d,1).replace(/\.0$/,"")} = ${k}σ 離れている。P(|X−μ| ≥ kσ) ≤ 1/k² = 1/${fmt(k*k,2).replace(/\.00$/,"")} ≈ ${fmt(100/(k*k),1)}%。`,1,"%");});
+add("r_var","r_joint",()=>{let p;do{p=[ri(1,7),ri(1,7),ri(1,7),0].map(v=>v*0.05);p[3]=Math.round((1-p[0]-p[1]-p[2])*100)/100;}while(p[3]<0.05);
+ const [p00,p01,p10,p11]=p,ex=p10+p11,ey=p01+p11,cov=p11-ex*ey,T=tbl(["","Y=0","Y=1"],[["X=0",fmt(p00),fmt(p01)],["X=1",fmt(p10),fmt(p11)]]),k=pick(["cov","exy","px"]);
+ if(k==="px")return mk("dist",`X, Y の同時確率分布が次の表のとき、P(X=1) は？${T}`,ex,[p11,p10,ey],`周辺分布：X=1 の行を合計して ${fmt(p10)} + ${fmt(p11)} = ${fmt(ex)}。`,2);
+ if(k==="exy")return mk("dist",`X, Y の同時確率分布が次の表のとき、E[XY] は？${T}`,p11,[ex*ey,ex+ey-1,p00],`XY=1 となるのは X=1 かつ Y=1 のときだけなので E[XY] = ${fmt(p11)}。`,2);
+ return mk("dist",`X, Y の同時確率分布が次の表のとき、Cov(X, Y) は？${T}`,cov,[p11,ex*ey,p11-ex],`E[X] = ${fmt(ex)}、E[Y] = ${fmt(ey)}、E[XY] = ${fmt(p11)}。Cov = E[XY] − E[X]E[Y] = ${fmt(p11)} − ${fmt(ex*ey,4)} = ${fmt(cov,4)}。`,4);});
+add("r_var","r_cdf",()=>{const pr=[ri(1,4),ri(1,4),ri(1,4),ri(1,4)],T=sum(pr),F=pr.map((_,i)=>sum(pr.slice(0,i+1))/T),a=ri(1,2),b=ri(a+1,4),ans=F[b-1]-F[a-1];
+ return mk("dist",`X は 1〜4 の値をとり、累積分布関数が F(1)=${fmt(F[0])}、F(2)=${fmt(F[1])}、F(3)=${fmt(F[2])}、F(4)=1.00。P(${a} &lt; X ≤ ${b}) は？`,ans,[F[b-1],1-F[a-1],1-F[b-1],F[b-1]+F[a-1]],
+ `P(${a} &lt; X ≤ ${b}) = F(${b}) − F(${a}) = ${fmt(F[b-1])} − ${fmt(F[a-1])} = ${fmt(ans)}。`,2);});
+add("r_disc","r_hyper",()=>{const N=ri(8,15),K=ri(2,4),ans=C(K,1)*C(N-K,2)/C(N,3);
+ return mk("dist",`${N}個の製品のうち${K}個が不良品。戻さずに3個取り出すとき、不良品がちょうど1個である確率は？`,ans,[3*(K/N)*Math.pow(1-K/N,2),K/N,C(K,1)*C(N-K,2)/(N*N*N)],
+ `超幾何分布。<sub>${K}</sub>C<sub>1</sub>×<sub>${N-K}</sub>C<sub>2</sub>/<sub>${N}</sub>C<sub>3</sub> = ${C(K,1)}×${C(N-K,2)}/${C(N,3)} ≈ ${fmt(ans,3)}。戻す場合（二項分布）とは違う。`,3);});
+add("s_samp","s_cc",()=>{const n=pick([50,100,200]),p=pick([0.2,0.3,0.4,0.5]),m=n*p,s=Math.sqrt(n*p*(1-p)),k=Math.round(m+pick([-1.5,-1,1,1.5,2])*s),z=(k+0.5-m)/s;
+ return mk("samp",`X ~ B(${n}, ${p})。P(X ≤ ${k}) を正規近似（連続修正あり）で求めるとき、標準化した値 z は？`,z,[(k-m)/s,(k-0.5-m)/s,(k+0.5-m)/(n*p*(1-p))],
+ `平均 np = ${fmt(m,1)}、標準偏差 √(np(1−p)) ≈ ${fmt(s,3)}。z = (${k}+0.5 − ${fmt(m,1)})/${fmt(s,3)} ≈ ${fmt(z)}。`,2);});
+add("e_other","e_varci",()=>{const n=pick([10,11,16,21]),df=n-1,s2=pick([4,6.5,9,12,16,25]),ci=C_DF.indexOf(df),up=CTAB[ci][2],lo=CTAB[ci][5],I=(a,b)=>`[${fmt(a)}, ${fmt(b)}]`;
+ return mkS("est",`正規母集団から n=${n}、不偏分散 s²=${s2}。母分散の95%信頼区間は？（χ²<sub>0.025</sub>(${df}) = ${lo}、χ²<sub>0.975</sub>(${df}) = ${up}）`,I(df*s2/lo,df*s2/up),[I(n*s2/lo,n*s2/up),I(df*Math.sqrt(s2)/lo,df*Math.sqrt(s2)/up),I(s2-1.96*Math.sqrt(s2),s2+1.96*Math.sqrt(s2))],
+ `(n−1)s² = ${df}×${s2} = ${fmt(df*s2,1)}。上側2.5%点 ${lo} で割ると下限、上側97.5%点 ${up} で割ると上限。`);});
+add("e_other","e_diffci",()=>{const x1=ri(50,80),x2=x1-ri(-3,8),s1=pick([6,8,10,12]),s2=pick([6,8,10,12]),n1=pick([25,36,49,64]),n2=pick([25,36,49,64]),se=Math.sqrt(s1*s1/n1+s2*s2/n2),d=x1-x2,I=k=>`[${fmt(d-k)}, ${fmt(d+k)}]`;
+ return mkS("est",`2群の母標準偏差は ${s1} と ${s2}（既知）。n₁=${n1}、x̄₁=${x1}、n₂=${n2}、x̄₂=${x2}。μ₁−μ₂ の95%信頼区間は？`,I(1.96*se),[I(1.96*(s1/Math.sqrt(n1)+s2/Math.sqrt(n2))),I(1.645*se),I(1.96*Math.sqrt(s1*s1+s2*s2))],
+ `標準誤差 = √(${s1}²/${n1} + ${s2}²/${n2}) ≈ ${fmt(se,3)}。${d} ± 1.96×${fmt(se,3)}。`);});
+add("h_basic","h_power",()=>{const m0=pick([50,100,200]),se=pick([1,2,4,5]),dl=pick([1,1.5,2,2.5,3]),m1=m0+dl*se,c=1.645-dl,ans=1-phi(c);
+ return mk("test",`H₀: μ=${m0}、H₁: μ>${m0}、有意水準5%の片側 z 検定（標準誤差 σ/√n = ${se}）。真の平均が ${fmt(m1,1).replace(/\.0$/,"")} のときの検出力は？（Φ(${fmt(Math.abs(c),3)}) = ${P(phi(Math.abs(c)))}）`,ans,[phi(c),1-phi(dl),0.05],
+ `棄却域は x̄ > ${m0} + 1.645×${se}。真の平均で標準化すると z > 1.645 − (${fmt(m1,1).replace(/\.0$/,"")}−${m0})/${se} = ${fmt(c,3)}。その確率 1 − Φ(${fmt(c,3)}) ≈ ${P(ans)}。`,3);});
+add("h_one","h_varstat",()=>{const n=pick([10,16,21,26]),s2=pick([12,15,18,25,30]),v0=pick([10,16,20]),x=(n-1)*s2/v0;
+ return mk("test",`H₀: σ²=${v0}。n=${n} の標本の不偏分散が ${s2}。検定統計量 χ² は？`,x,[n*s2/v0,(n-1)*v0/s2,s2/v0],`χ² = (n−1)s²/σ₀² = ${n-1}×${s2}/${v0} = ${fmt(x)}。自由度 ${n-1} のカイ二乗分布と比べる。`,2);});
+add("h_two","h_pooled",()=>{const n1=ri(8,15),n2=ri(8,15),x1=ri(50,70),x2=x1-pick([2,3,4,5,6]),v1=pick([9,16,25,36]),v2=pick([9,16,25,36]),sp2=((n1-1)*v1+(n2-1)*v2)/(n1+n2-2),t=(x1-x2)/Math.sqrt(sp2*(1/n1+1/n2));
+ return mk("test",`等分散を仮定した2標本 t 検定。n₁=${n1}、x̄₁=${x1}、s₁²=${v1}、n₂=${n2}、x̄₂=${x2}、s₂²=${v2}。t 値は？`,t,[(x1-x2)/Math.sqrt(sp2),(x1-x2)/(Math.sqrt(sp2)*(1/n1+1/n2)),(x1-x2)/Math.sqrt(v1/n1+v2/n2),(x1-x2)/Math.sqrt(sp2/(n1+n2))],
+ `プールした分散 s<sub>p</sub>² = (${n1-1}×${v1} + ${n2-1}×${v2})/${n1+n2-2} ≈ ${fmt(sp2,3)}。t = ${x1-x2}/√(${fmt(sp2,3)}×(1/${n1}+1/${n2})) ≈ ${fmt(t)}。自由度 ${n1+n2-2}。`,2);});
+add("h_two","h_fratio",()=>{const n1=ri(8,16),n2=ri(8,16),a=pick([12,18,20,24,30]),b=pick([6,8,10,15]),big=a>=b,F=big?a/b:b/a,S=(f,x,y)=>`F = ${fmt(f)}、自由度 (${x}, ${y})`;
+ const ans=big?S(F,n1-1,n2-1):S(F,n2-1,n1-1);
+ return mkS("test",`母分散が等しいかの F 検定。群1：n=${n1}、s²=${a}。群2：n=${n2}、s²=${b}。大きい方の不偏分散を分子にしたときの F と自由度は？`,ans,[big?S(F,n2-1,n1-1):S(F,n1-1,n2-1),big?S(F,n1,n2):S(F,n2,n1),big?S(1/F,n1-1,n2-1):S(1/F,n2-1,n1-1),S(F*F,n1-1,n2-1),S(Math.abs(a-b),n1-1,n2-1)],
+ `F = ${Math.max(a,b)}/${Math.min(a,b)} = ${fmt(F)}。自由度は（分子の n−1, 分母の n−1）。`);});
+add("h_two","h_prop2",()=>{const n1=pick([100,200,250]),n2=pick([100,200,250]),x1=Math.round(n1*pick([0.3,0.35,0.4,0.45])),x2=Math.round(n2*pick([0.2,0.25,0.3])),p1=x1/n1,p2=x2/n2,pp=(x1+x2)/(n1+n2),z=(p1-p2)/Math.sqrt(pp*(1-pp)*(1/n1+1/n2));
+ return mk("test",`A群 ${n1}人中 ${x1}人、B群 ${n2}人中 ${x2}人が「はい」と答えた。H₀: p<sub>A</sub>=p<sub>B</sub> の検定統計量 z（プールした比率を使う）は？`,z,[(p1-p2)/Math.sqrt(p1*(1-p1)/n1+p2*(1-p2)/n2),(p1-p2)/Math.sqrt(pp*(1-pp)/(n1+n2)),(p1-p2)/(pp*(1-pp)*(1/n1+1/n2))],
+ `p̂ = (${x1}+${x2})/(${n1}+${n2}) ≈ ${fmt(pp,4)}。z = (${fmt(p1,3)}−${fmt(p2,3)})/√(${fmt(pp,4)}×${fmt(1-pp,4)}×(1/${n1}+1/${n2})) ≈ ${fmt(z)}。`,2);});
+add("m_r1","m_slope",()=>{const sxx=pick([40,50,80,100,125,200]),b=pick([0.4,0.5,0.8,1.2,1.5,2,-0.6]),sxy=sxx*b,xb=ri(5,30),yb=ri(20,90),a=yb-b*xb,L=(a0,b0)=>`ŷ = ${fmt(a0,1)} ${b0<0?"−":"+"} ${fmt(Math.abs(b0),2)}x`;
+ return mkS("reg",`Σ(x−x̄)² = ${sxx}、Σ(x−x̄)(y−ȳ) = ${fmt(sxy,0)}、x̄ = ${xb}、ȳ = ${yb}。最小二乗法による回帰直線は？`,L(a,b),[L(yb-sxx/sxy*xb,sxx/sxy),L(yb+b*xb,b),L(xb-b*yb,b),L(a,b*2)],
+ `傾き b = ${fmt(sxy,0)}/${sxx} = ${fmt(b,2)}。切片 = ȳ − b x̄ = ${yb} − ${fmt(b,2)}×${xb} = ${fmt(a,1)}。`);});
+add("m_r1","m_resid",()=>{const kind=pick(["ok","curve","funnel"]);let pts="";for(let i=0;i<45;i++){const x=Math.random(),e=kind==="ok"?randn()*0.6:kind==="curve"?(x-0.5)*(x-0.5)*9-0.75+randn()*0.18:randn()*0.12*(0.4+x*4.5);
+ pts+=`<circle cx="${fmt(30+x*220,1)}" cy="${fmt(100-Math.max(-1.6,Math.min(1.6,e))*50,1)}" r="3" fill="var(--accent)" opacity=".75"/>`;}
+ const g=svg(270,195,`<line x1="30" y1="100" x2="255" y2="100" ${GR} stroke-dasharray="4 3"/><line x1="30" y1="15" x2="30" y2="185" ${AX}/><line x1="30" y1="185" x2="255" y2="185" ${AX}/><text x="200" y="196" ${TX}>予測値</text><text x="4" y="20" ${TX}>残差</text>${pts}`);
+ const O=["特に問題は見られない","非線形の関係が残っている","残差のばらつきが一定でない（不均一分散）","多重共線性が起きている"],a={ok:0,curve:1,funnel:2}[kind];
+ return mkS("reg",`回帰分析の残差プロットが次のようになった。最も適切な解釈は？${g}`,O[a],O.filter((_,i)=>i!==a),
+ {ok:"残差が0の周りに一様にばらついていて、パターンがない。",curve:"U字型のパターンがある。2次の項を入れるなどを検討する。",funnel:"予測値が大きいほど残差の幅が広がっている（ラッパ型）。対数変換などを検討する。"}[kind]+"多重共線性は説明変数どうしの相関の問題で、残差プロットからは読めない。");});
+add("m_out","m_table",()=>{const n=ri(30,80),df=n-3,rows=[["(Intercept)",ri(-200,500)/10,ri(10,80)/10],["x1",ri(5,60)/10,ri(2,15)/10],["x2",-ri(5,40)/10,ri(2,15)/10]];
+ const r=ri(1,2),miss=pick(["t","se","est"]),[nm,b,se]=rows[r],t=b/se;
+ const T=tbl(["","Estimate","Std. Error","t value","Pr(&gt;|t|)"],rows.map(([nm2,b2,s2],i)=>[nm2,i===r&&miss==="est"?"<b>?</b>":fmt(b2,2),i===r&&miss==="se"?"<b>?</b>":fmt(s2,2),i===r&&miss==="t"?"<b>?</b>":fmt(b2/s2,2),pTxt(tP(b2/s2,df))]));
+ const ask={t:["t value",t,[se/b,b*se,b-se]],se:["Std. Error",se,[b*t,t/b,b-t]],est:["Estimate",b,[t/se,se-t,se*t*2]]}[miss];
+ return mk("reg",`重回帰（n=${n}）の出力の「?」に入る ${nm} の ${ask[0]} は？${T}`,ask[1],ask[2],`t value = Estimate / Std. Error。${nm}：${fmt(b,2)} / ${fmt(se,2)} = ${fmt(t,2)}。`,2);});
+add("m_out","m_signif",()=>{const n=ri(40,100),df=n-4,names=["x1","x2","x3"],sig=names.map(()=>Math.random()<.5),rows=names.map((nm,i)=>{const se=ri(5,30)/10,t=(sig[i]?(2.3+Math.random()*2.5):(Math.random()*1.6))*(Math.random()<.5?-1:1);return [nm,t*se,se,t];});
+ const T=tbl(["","Estimate","Std. Error","t value","Pr(&gt;|t|)"],[["(Intercept)",fmt(ri(-100,300)/10,2),fmt(ri(10,50)/10,2),"",""]].concat(rows.map(([nm,b,se,t])=>[nm,fmt(b,2),fmt(se,2),fmt(t,2),pTxt(tP(t,df))])));
+ const L=s=>{const a=names.filter((_,i)=>s[i]);return a.length?a.join(" と "):"どれも有意でない";},ans=L(sig);
+ const all=[];for(let m=0;m<8;m++)all.push(L([m&1,m&2,m&4].map(Boolean)));
+ return mkS("reg",`重回帰（n=${n}）の出力。有意水準5%で有意な説明変数をすべて挙げたものは？${T}`,ans,pickOthers([...new Set(all)],ans,3),
+ `Pr(&gt;|t|) が 0.05 未満の変数を選ぶ。|t| がおよそ2を超えるかでも判断できる。係数の符号（正負）は有意性に関係しない。`);});
+add("m_out","m_fstat",()=>{const n=pick([30,40,50,60,100]),p=pick([2,3,4]),R=pick([0.3,0.4,0.5,0.6,0.7]),F=(R/p)/((1-R)/(n-p-1));
+ return mk("reg",`n=${n}、説明変数 ${p}個の重回帰で R²=${R}。モデル全体の F 統計量は？`,F,[R/(1-R),(R/p)/((1-R)/(n-1)),(R/(p+1))/((1-R)/(n-p-1))],
+ `F = (R²/p)/((1−R²)/(n−p−1)) = (${R}/${p})/(${fmt(1-R,1)}/${n-p-1}) ≈ ${fmt(F)}。自由度 (${p}, ${n-p-1})。`,2);});
+add("a_anova","a_table",()=>{const k=ri(3,5),m=ri(4,8),N=k*m,SB=ri(4,40)*5,SW=ri(10,60)*5,d1=k-1,d2=N-k,MB=SB/d1,MW=SW/d2,F=MB/MW,miss=pick(["F","MB","SW","d2"]);
+ const cell=(v,key,d)=>miss===key?"<b>?</b>":fmt(v,d);
+ const T=tbl(["要因","自由度","平方和","平均平方","F"],[["群間",d1,SB,cell(MB,"MB",2),cell(F,"F",2)],["群内",cell(d2,"d2",0),cell(SW,"SW",0),fmt(MW,2),""],["全体",N-1,SB+SW,"",""]]);
+ const A={F:[F,[MB/SW,SB/SW,MW/MB]],MB:[MB,[SB/k,SB*d1,SB/N]],SW:[SW,[SB+SW+SW,MW*N,MW*(N-1)]],d2:[d2,[N-1,N,d1]]}[miss];
+ return mk("anova",`一元配置分散分析表の「?」に入る値は？${T}`,A[0],A[1],`平均平方 = 平方和/自由度、F = 群間の平均平方/群内の平均平方。群内の自由度 = 全体 ${N-1} − 群間 ${d1} = ${d2}。`,miss==="d2"||miss==="SW"?0:2);});
+add("a_anova","a_twoway",()=>{const a=ri(2,4),b=ri(2,5),r=ri(2,4),k=pick(["ab","e"]);
+ return k==="ab"?mk("anova",`二元配置分散分析（要因A ${a}水準 × 要因B ${b}水準、各組合せ ${r}回ずつ）。交互作用の自由度は？`,(a-1)*(b-1),[a*b-1,(a-1)+(b-1),a*b*(r-1)],`(a−1)(b−1) = ${a-1}×${b-1} = ${(a-1)*(b-1)}。`,0)
+ :mk("anova",`二元配置分散分析（要因A ${a}水準 × 要因B ${b}水準、各組合せ ${r}回ずつ）。誤差（残差）の自由度は？`,a*b*(r-1),[a*b*r-1,(a-1)*(b-1),a*b*r-a-b],`全体 ${a*b*r-1} から A ${a-1}、B ${b-1}、交互作用 ${(a-1)*(b-1)} を引いて ab(r−1) = ${a*b*(r-1)}。`,0);});
+add("a_ts","a_correlogram",()=>{const P=pick([4,12]),L=P===4?16:24;let bars="";const w=220/L;
+ for(let h=1;h<=L;h++){const r=Math.cos(2*Math.PI*h/P)*Math.pow(0.97,h)*0.75+randn()*0.05,y=100-r*70;bars+=`<rect x="${32+(h-1)*w+1}" y="${Math.min(y,100)}" width="${w-2}" height="${Math.abs(100-y)}" fill="var(--accent)" opacity=".8"/>`;}
+ let ticks="";for(let h=P;h<=L;h+=P)ticks+=`<text x="${32+(h-0.5)*w}" y="186" ${TX} text-anchor="middle">${h}</text>`;
+ const g=svg(270,205,`<line x1="30" y1="100" x2="255" y2="100" ${AX}/><line x1="30" y1="25" x2="30" y2="175" ${AX}/><text x="2" y="30" ${TX}>+1</text><text x="2" y="178" ${TX}>−1</text>${bars}${ticks}<text x="34" y="201" ${TX}>ラグ →</text>`);
+ const O=P===4?["4期（四半期データなら1年）","2期","8期","12期"]:["12期（月次データなら1年）","6期","4期","24期"];
+ return mkS("anova",`ある時系列のコレログラム（自己相関）。最も考えられる周期は？${g}`,O[0],O.slice(1),`ラグ ${P}、${2*P} … で自己相関が大きく正になっているので、${P}期ごとに似た動きを繰り返している。`);});
+add("a_ts","a_cagr",()=>{const n=pick([2,3,4,5]),v0=pick([100,200,400,500]),g=pick([3,5,8,10,12,-4]),vn=Math.round(v0*Math.pow(1+g/100,n)),ans=(Math.pow(vn/v0,1/n)-1)*100;
+ return mk("anova",`売上が ${n}年間で ${v0} から ${vn} になった。1年あたりの平均成長率（幾何平均）は？`,ans,[(vn/v0-1)/n*100,(vn/v0-1)*100,(Math.pow(vn/v0,1/(n+1))-1)*100],
+ `(${vn}/${v0})^(1/${n}) − 1 ≈ ${fmt(ans/100,4)}。全体の伸びを年数で割る（${fmt((vn/v0-1)/n*100,1)}%）のは誤り。`,1,"%");});
+add("a_ts","a_index",()=>{const yrs=[2021,2022,2023,2024],v=yrs.map(()=>ri(80,160)),b=ri(0,3);let t;do{t=ri(0,3);}while(t===b);const ans=v[t]/v[b]*100;
+ return mk("anova",`${tbl(["年",...yrs],[["値",...v]])}${yrs[b]}年を基準（=100）としたときの${yrs[t]}年の指数は？`,ans,[v[b]/v[t]*100,v[t]-v[b],v[t]/v[(b+1)%4]*100,v[t]/v[(b+2)%4]*100],`${v[t]}/${v[b]}×100 ≈ ${fmt(ans,1)}。`,1);});
+
+// 出題：fid（分野）または tid（項目）で絞る。pool を渡すとその中から選ぶ
+function genOne(o){o=o||{};let L=GENS;if(o.tid)L=GENS.filter(g=>g.t===o.tid);else if(o.fid)L=GENS.filter(g=>TOPIC[g.t].f===o.fid);if(o.pool)L=o.pool;
+ const g=pick(L),q=g.fn();q.t=g.t;q.f=TOPIC[g.t].f;q.k=g.k;q.id="g";return q;}
