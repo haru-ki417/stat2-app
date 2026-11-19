@@ -116,3 +116,9 @@ sub,sup{font-size:.72em}
 .chip{flex:1;display:flex;justify-content:space-between;align-items:center;padding:7px 10px;border-radius:9px;border:1px solid var(--line);background:var(--card);color:var(--sub);font-size:12.5px}
 .chip b{background:var(--accent-soft)}
 .chip:disabled,.big.cnt:disabled{opacity:.4}
+/* ---- チェック ---- */
+.mrow{display:flex;justify-content:flex-end;margin:-4px 0 4px}
+.mark{border:1px solid var(--line);background:var(--card);color:var(--sub);border-radius:999px;padding:5px 12px;font-size:13px;font-weight:600}
+.mark.on{border-color:#d9a400;background:#fff6d6;color:#9a6f00}
+@media (prefers-color-scheme:dark){.mark.on{background:#3a3214;color:#f2c94c;border-color:#8a6d1a}}
+.big.cnt{font-size:13.5px;gap:4px;padding-left:4px;padding-right:4px}
