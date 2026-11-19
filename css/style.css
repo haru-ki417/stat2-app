@@ -109,3 +109,10 @@ sub,sup{font-size:.72em}
 @media (prefers-color-scheme:dark){.keys button.eq{color:#111}}
 .wrap{padding-bottom:calc(80px + env(safe-area-inset-bottom))}
 .dense .qt{font-size:10px;letter-spacing:-.2px}.dense .qt th,.dense .qt td{padding:4px 1px}
+/* ---- 未回答・間違いで絞る ---- */
+.big.cnt{display:flex;justify-content:center;align-items:center;gap:6px;font-size:14.5px}
+.big.cnt b,.chip b{font-size:12px;padding:1px 7px;border-radius:999px;background:var(--card);color:var(--accent)}
+.chips{margin-top:6px}
+.chip{flex:1;display:flex;justify-content:space-between;align-items:center;padding:7px 10px;border-radius:9px;border:1px solid var(--line);background:var(--card);color:var(--sub);font-size:12.5px}
+.chip b{background:var(--accent-soft)}
+.chip:disabled,.big.cnt:disabled{opacity:.4}

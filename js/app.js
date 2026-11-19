@@ -5,8 +5,8 @@ const KEY="stat2_v1";
 let S={};
 try{const r=localStorage.getItem(KEY);if(r)S=JSON.parse(r)||{};}catch(e){}
 // st: 知識問題ごと [正解, 解答]／dr: 分野ごとの計算／gp: 計算パターンごと／tp: 項目ごと
-// srs: 知識問題の復習 [段階, 次に出す日]／log: 直近の解答 [分野, 正誤]／mock: 模試の記録／cur: 途中の模試
-["st","dr","gp","tp","srs"].forEach(k=>S[k]=S[k]||{});["log","mock","wrong"].forEach(k=>S[k]=S[k]||[]);
+// gl: 計算パターンごとの直近の正誤（1/0）／srs: 知識問題の復習 [段階, 次に出す日]／log: 直近の解答 [分野, 正誤]／mock: 模試の記録／cur: 途中の模試
+["st","dr","gp","tp","srs","gl"].forEach(k=>S[k]=S[k]||{});["log","mock","wrong"].forEach(k=>S[k]=S[k]||[]);
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
 const today=()=>{const d=new Date();return Math.floor((d.getTime()-d.getTimezoneOffset()*60000)/864e5);};
 // 旧版の「間違えた問題」は今日の復習に移す
@@ -22,7 +22,7 @@ const IV=[0,1,3,7,14,30];
 function record(q,ok){
   const inc=(o,k)=>{const v=o[k]||[0,0];v[1]++;if(ok)v[0]++;o[k]=v;};
   inc(S.tp,q.t);
-  if(q.gen){inc(S.dr,q.f);inc(S.gp,q.k);}
+  if(q.gen){inc(S.dr,q.f);inc(S.gp,q.k);S.gl[q.k]=ok?1:0;}
   else{
     const first=!S.st[q.id];inc(S.st,q.id);
     const s=S.srs[q.id]||[0,0];s[0]=ok?Math.min(first?2:s[0]+1,5):0;s[1]=today()+IV[s[0]];S.srs[q.id]=s;
@@ -30,6 +30,19 @@ function record(q,ok){
   S.log.push([q.f,ok?1:0]);if(S.log.length>800)S.log.splice(0,S.log.length-800);
 }
 const dueList=()=>Q.filter(q=>S.srs[q.id]&&S.srs[q.id][1]<=today());
+// 未回答・間違えた問題（直近の解答が不正解）を、全体・分野・項目で絞って数える
+function lists(o){
+  o=o||{};const inK=q=>o.tid?q.t===o.tid:o.fid?q.f===o.fid:true,inG=g=>o.tid?g.t===o.tid:o.fid?TOPIC[g.t].f===o.fid:true;
+  const K=Q.filter(inK),G=GENS.filter(inG);
+  const gWrong=g=>S.gl[g.k]!==undefined?S.gl[g.k]===0:!!(S.gp[g.k]&&S.gp[g.k][0]<S.gp[g.k][1]);
+  return {unK:K.filter(q=>!S.st[q.id]),unG:G.filter(g=>!S.gp[g.k]),wrK:K.filter(q=>S.srs[q.id]&&S.srs[q.id][0]===0),wrG:G.filter(gWrong)};
+}
+const cntUn=L=>L.unK.length+L.unG.length,cntWr=L=>L.wrK.length+L.wrG.length;
+function filterBtns(o,cls){
+  const L=lists(o),a=JSON.stringify(o).replace(/"/g,"'"),u=cntUn(L),w=cntWr(L);
+  return `<button class="${cls}" onclick="start(Object.assign(${a},{mode:'un'}))" ${u?"":"disabled"}>未回答だけ<b>${u}</b></button>
+  <button class="${cls}" onclick="start(Object.assign(${a},{mode:'wrong'}))" ${w?"":"disabled"}>間違いだけ<b>${w}</b></button>`;
+}
 
 // 推定得点：分野ごとの直近の正答率を、模試の配分（FIELDS の m）で重み付け
 const NEED=8;
@@ -60,14 +73,17 @@ function home(){
   <div class="card"><p class="small" style="margin:0 0 8px">練習する</p>
    <button class="big" onclick="start({mode:'mix',n:10})">ミックス10問</button>
    <div class="row"><button class="big sec" onclick="start({mode:'k',n:10})">知識10問</button><button class="big sec" onclick="start({mode:'g',n:10})">計算10問</button></div>
-   <button class="big sec" onclick="start({mode:'weak',n:10})">苦手な計算10問</button></div>
+   <button class="big sec" onclick="start({mode:'weak',n:10})">苦手な計算10問</button>
+   <div class="row">${filterBtns({},"big sec cnt")}</div>
+   <p class="small" style="margin:2px 0 0">「間違いだけ」は直近の解答が不正解だった問題。正解すると外れます。計算は同じパターンを数値を変えて出します。</p></div>
   <p class="small" style="margin:12px 2px 8px">分野別（％は正答率）</p>`;
   FIELDS.forEach(f=>{
     let a=0,b=0;Q.filter(q=>q.f===f.id).forEach(q=>{const s=S.st[q.id];if(s){a+=s[0];b+=s[1];}});
     const d=S.dr[f.id]||[0,0],nk=Q.filter(q=>q.f===f.id).length,ng=GENS.filter(g=>TOPIC[g.t].f===f.id).length;
     h+=`<div class="fbox"><div class="fname">${f.name}<small>${f.sub}</small></div><div class="row">
     <button class="fbtn" onclick="start({mode:'k',fid:'${f.id}'})">知識 ${nk}問<b>${pc(a,b)}</b></button>
-    <button class="fbtn" onclick="start({mode:'g',fid:'${f.id}',n:10})">計算 ${ng}種<b>${pc(d[0],d[1])}</b></button></div></div>`;
+    <button class="fbtn" onclick="start({mode:'g',fid:'${f.id}',n:10})">計算 ${ng}種<b>${pc(d[0],d[1])}</b></button></div>
+    <div class="row chips">${filterBtns({fid:f.id},"chip")}</div></div>`;
   });
   h+=`<button class="link" onclick="resetAll()">成績をリセット</button><span id="rs" class="small"></span>`;
   $("home").innerHTML=h;
@@ -75,7 +91,7 @@ function home(){
 let confirmReset=false;
 function resetAll(){
   if(!confirmReset){confirmReset=true;$("rs").textContent=" もう一度押すとすべての記録を消します";return;}
-  S={st:{},dr:{},gp:{},tp:{},srs:{},log:[],mock:[],wrong:[]};save();confirmReset=false;home();
+  S={st:{},dr:{},gp:{},tp:{},srs:{},gl:{},log:[],mock:[],wrong:[]};save();confirmReset=false;home();
 }
 
 // ---------- 範囲チェック ----------
@@ -99,7 +115,8 @@ function openTopic(id){
   <p class="small" style="margin:0 0 8px">${t.terms}</p>
   <div class="meta"><span>解いた ${i.seen} / ${i.all}　正答率 ${pc(i.st[0],i.st[1])}</span><span class="badge ${i.status[1]}">${i.status[0]}</span></div>
   <button class="big" onclick="start({mode:'mix',tid:'${id}',n:10})">この項目を10問</button>
-  <div class="row">${i.kq?`<button class="big sec" onclick="start({mode:'k',tid:'${id}'})">知識 ${i.kq}問</button>`:""}${i.kg?`<button class="big sec" onclick="start({mode:'g',tid:'${id}',n:10})">計算 ${i.kg}種</button>`:""}</div></div>
+  <div class="row">${i.kq?`<button class="big sec" onclick="start({mode:'k',tid:'${id}'})">知識 ${i.kq}問</button>`:""}${i.kg?`<button class="big sec" onclick="start({mode:'g',tid:'${id}',n:10})">計算 ${i.kg}種</button>`:""}</div>
+  <div class="row chips">${filterBtns({tid:id},"chip")}</div></div>
   <div class="card f"><h3>要点</h3>${t.n.map(x=>`<p>・${x}</p>`).join("")}</div>`;
   go("topic");
 }
@@ -118,6 +135,9 @@ function start(o){
   const byScope=q=>o.tid?q.t===o.tid:o.fid?q.f===o.fid:true;
   const n=o.n;
   if(o.mode==="review")set=shuffle(dueList()).slice(0,30);
+  else if(o.mode==="un"||o.mode==="wrong"){// 1回 20問まで。続きは結果画面から
+    const L=lists(o),K=o.mode==="un"?L.unK:L.wrK,G=o.mode==="un"?L.unG:L.wrG;
+    set=shuffle(K.map(q=>({q})).concat(G.map(g=>({g})))).slice(0,20).map(x=>x.q||genOne({pool:[x.g]}));}
   else if(o.mode==="k")set=pickK(Q.filter(byScope),n);
   else if(o.mode==="g")set=Array.from({length:n||10},()=>genOne({fid:o.fid,tid:o.tid}));
   else if(o.mode==="weak"){const P=weakPool();set=Array.from({length:n||10},()=>genOne({pool:P}));}
@@ -153,11 +173,13 @@ function result(){
   const e=estimate();
   let h=`<div class="card"><p class="small" style="text-align:center;margin:0">結果</p><div class="score">${correct} / ${set.length}</div>
   <p style="text-align:center;margin:0 0 12px" class="small">正答率 ${Math.round(correct/set.length*100)}%${e.score!==undefined?`　推定得点 ${e.score}点`:""}</p>`;
-  if(last&&last.mode!=="k"&&last.mode!=="review")h+=`<button class="big" id="more">続けて10問</button>`;
+  if(last&&(last.mode==="un"||last.mode==="wrong")){const L=lists(last),r=last.mode==="un"?cntUn(L):cntWr(L);
+    h+=r?`<button class="big" id="more">続けて解く（${last.mode==="un"?"未回答":"間違い"} 残り ${r}問）</button>`:`<p class="small" style="text-align:center;margin:0 0 10px">${last.mode==="un"?"未回答の問題はもうありません":"間違えた問題はもうありません"}</p>`;}
+  else if(last&&last.mode!=="k"&&last.mode!=="review")h+=`<button class="big" id="more">続けて10問</button>`;
   if(missed.length)h+=`<button class="big sec" id="rm">間違えた ${missed.length} 問をもう一度</button>`;
   h+=`<button class="big sec" onclick="go(backTo)">戻る</button></div>`;
   $("quiz").innerHTML=h;
-  if($("more"))$("more").onclick=()=>start(Object.assign({},last,{n:10}));
+  if($("more"))$("more").onclick=()=>start(Object.assign({},last,last.mode==="un"||last.mode==="wrong"?{}:{n:10}));
   if(missed.length)$("rm").onclick=()=>{set=shuffle(missed);idx=0;correct=0;missed=[];render();};
   window.scrollTo(0,0);
 }
